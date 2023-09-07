@@ -1,11 +1,11 @@
 network:
-  - dim: 256
+  - dim1: 256
+    dim2: 256
     aggr: 'mean'
     loss: 'softmax'
-    arch: '1-1-1'
-    attention: 4
+    arch: '0-0'
     act: 'relu'
-    bias: 'norm'
+    bias: 'bias'
 params:
   - lr: 0.01
     dropout: 0.3

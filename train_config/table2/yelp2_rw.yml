@@ -1,10 +1,11 @@
 network:
-  - dim: 512
-    aggr: 'concat'
+  - dim1: 512
+    dim2: 512
+    aggr: 'mean'
     loss: 'sigmoid'
-    arch: '1-1-0'
+    arch: '0-0'
     act: 'relu'
-    bias: 'norm'
+    bias: 'bias'
 params:
   - lr: 0.01
     dropout: 0.1
@@ -13,5 +14,5 @@ params:
 phase:
   - end: 75
     sampler: 'rw'
-    num_root: 1250
+    num_root: 256
     depth: 2

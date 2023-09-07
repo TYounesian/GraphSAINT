@@ -9,7 +9,7 @@ import scipy
 
 import numpy as np
 import time
-
+import pdb
 
 
 def _coo_scipy2torch(adj):
@@ -188,6 +188,7 @@ class Minibatch:
         #   3. estimate norm factor alpha and lambda
         tot_sampled_nodes = 0
         while True:
+            #pdb.set_trace()
             self.par_graph_sample('train')
             tot_sampled_nodes = sum([len(n) for n in self.subgraphs_remaining_nodes])
             if tot_sampled_nodes > self.sample_coverage * self.node_train.size:

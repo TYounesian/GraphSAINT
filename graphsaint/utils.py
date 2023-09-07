@@ -102,7 +102,7 @@ def parse_layer_yml(arch_gcn,dim_input):
     bias_layer = [arch_gcn['bias']]*num_layers
     act_layer = [arch_gcn['act']]*num_layers
     aggr_layer = [arch_gcn['aggr']]*num_layers
-    dims_layer = [arch_gcn['dim']]*num_layers
+    dims_layer = [arch_gcn['dim1'], arch_gcn['dim2']]
     order_layer = [int(o) for o in arch_gcn['arch'].split('-')]
     return [dim_input]+dims_layer,order_layer,act_layer,bias_layer,aggr_layer
 
@@ -132,11 +132,12 @@ def parse_n_prepare(flags):
     for ph in train_phases:
         assert 'end' in ph
         assert 'sampler' in ph
+    log_wandb = train_config['log_wandb']
     print("Loading training data..")
     temp_data = load_data(flags.data_prefix)
     train_data = process_graph_data(*temp_data)
     print("Done loading training data..")
-    return train_params,train_phases,train_data,arch_gcn
+    return train_params,train_phases,train_data,arch_gcn,log_wandb
 
 
 

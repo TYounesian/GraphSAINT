@@ -4,8 +4,8 @@ from graphsaint.pytorch_version.minibatch import Minibatch
 from graphsaint.utils import *
 from graphsaint.metric import *
 from graphsaint.pytorch_version.utils import *
-
-
+import pdb
+import wandb
 import torch
 import time
 
@@ -70,6 +70,7 @@ def train(train_phases, model, minibatch, minibatch_eval, model_eval, eval_val_e
     for ip, phase in enumerate(train_phases):
         printf('START PHASE {:4d}'.format(ip),style='underline')
         minibatch.set_sampler(phase)
+        pdb.set_trace()
         num_batches = minibatch.num_training_batches()
         for e in range(epoch_ph_start, int(phase['end'])):
             printf('Epoch {:4d}'.format(e),style='bold')
@@ -85,6 +86,8 @@ def train(train_phases, model, minibatch, minibatch_eval, model_eval, eval_val_e
                     l_loss_tr.append(loss_train)
                     l_f1mic_tr.append(f1_mic)
                     l_f1mac_tr.append(f1_mac)
+                    wandb.log({'train-mini-batch-loss': loss_train,
+                               'train-f1mic': f1_mic})
             if (e+1)%eval_val_every == 0:
                 if args_global.cpu_eval:
                     torch.save(model.state_dict(),'tmp.pkl')
@@ -96,25 +99,27 @@ def train(train_phases, model, minibatch, minibatch_eval, model_eval, eval_val_e
                         .format(f_mean(l_loss_tr), f_mean(l_f1mic_tr), f_mean(l_f1mac_tr), time_train_ep))
                 printf(' VALIDATION:     loss = {:.4f}\tmic = {:.4f}\tmac = {:.4f}'\
                         .format(loss_val, f1mic_val, f1mac_val), style='yellow')
-                if f1mic_val > f1mic_best:
-                    f1mic_best, ep_best = f1mic_val, e
-                    if not os.path.exists(dir_saver):
-                        os.makedirs(dir_saver)
-                    printf('  Saving model ...', style='yellow')
-                    torch.save(model.state_dict(), path_saver)
-            time_train += time_train_ep
+                wandb.log({'val-loss': loss_val,
+                               'val-f1mic': f1mic_val})
+                time_train += time_train_ep
+                wandb.log({'train-mini-batch-loss': loss_train})
+        if not os.path.exists(dir_saver):
+            os.makedirs(dir_saver)
+        printf('  Saving model ...', style='yellow')
+        torch.save(model.state_dict(), path_saver)
         epoch_ph_start = int(phase['end'])
     printf("Optimization Finished!", style="yellow")
-    if ep_best >= 0:
-        if args_global.cpu_eval:
-            model_eval.load_state_dict(torch.load(path_saver, map_location=lambda storage, loc: storage))
-        else:
-            model.load_state_dict(torch.load(path_saver))
-            model_eval=model
-        printf('  Restoring model ...', style='yellow')
+    if args_global.cpu_eval:
+        model_eval.load_state_dict(torch.load(path_saver, map_location=lambda storage, loc: storage))
+    else:
+        model.load_state_dict(torch.load(path_saver))
+        model_eval=model
+    printf('  Restoring model ...', style='yellow')
     loss, f1mic_both, f1mac_both = evaluate_full_batch(model_eval, minibatch_eval, mode='valtest')
     f1mic_val, f1mic_test = f1mic_both
     f1mac_val, f1mac_test = f1mac_both
+    wandb.log({'test-f1mic': f1mic_test})
+
     printf("Full validation (Epoch {:4d}): \n  F1_Micro = {:.4f}\tF1_Macro = {:.4f}"\
             .format(ep_best, f1mic_val, f1mac_val), style='red')
     printf("Full test stats: \n  F1_Micro = {:.4f}\tF1_Macro = {:.4f}"\
@@ -124,8 +129,13 @@ def train(train_phases, model, minibatch, minibatch_eval, model_eval, eval_val_e
 
 if __name__ == '__main__':
     log_dir(args_global.train_config, args_global.data_prefix, git_branch, git_rev, timestamp)
-    train_params, train_phases, train_data, arch_gcn = parse_n_prepare(args_global)
+    train_params, train_phases, train_data, arch_gcn, log_wandb = parse_n_prepare(args_global)
     if 'eval_val_every' not in train_params:
         train_params['eval_val_every'] = EVAL_VAL_EVERY_EP
     model, minibatch, minibatch_eval, model_eval = prepare(train_data, train_params, arch_gcn)
+    wandb.init(project='graphsaint',
+               entity='gflow-samp',
+               mode='online' if log_wandb else 'disabled',
+               config={'train_params': train_params, 'train_phases': train_phases,
+                       'arch_gcn':arch_gcn, 'dataset': args_global.data_prefix})
     train(train_phases, model, minibatch, minibatch_eval, model_eval, train_params['eval_val_every'])

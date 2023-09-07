@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 from graphsaint.utils import *
 import graphsaint.pytorch_version.layers as layers
-
+import pdb
 
 class GraphSAINT(nn.Module):
     def __init__(self, num_classes, arch_gcn, train_params, feat_full, label_full, cpu_eval=False):
@@ -38,7 +38,7 @@ class GraphSAINT(nn.Module):
                 self.aggregator_cls = layers.AttentionAggregator
                 self.mulhead = int(arch_gcn['attention'])
         else:
-            self.aggregator_cls = layers.HighOrderAggregator
+            self.aggregator_cls = layers.my_HighOrderAggregator
             self.mulhead = 1
         self.num_layers = len(arch_gcn['arch'].split('-'))
         self.weight_decay = train_params['weight_decay']
@@ -114,8 +114,8 @@ class GraphSAINT(nn.Module):
         label_subg_converted = label_subg if self.sigmoid_loss else self.label_full_cat[node_subgraph]
         _, emb_subg = self.conv_layers((adj_subgraph, feat_subg))
         emb_subg_norm = F.normalize(emb_subg, p=2, dim=1)
-        pred_subg = self.classifier((None, emb_subg_norm))[1]
-        return pred_subg, label_subg, label_subg_converted
+        #pred_subg = self.classifier((None, emb_subg_norm))[1]
+        return emb_subg, label_subg, label_subg_converted
 
 
     def _loss(self, preds, labels, norm_loss):
@@ -124,8 +124,10 @@ class GraphSAINT(nn.Module):
         """
         if self.sigmoid_loss:
             norm_loss = norm_loss.unsqueeze(1)
+            #pdb.set_trace()
             return torch.nn.BCEWithLogitsLoss(weight=norm_loss,reduction='sum')(preds, labels)
         else:
+            #pdb.set_trace()
             _ls = torch.nn.CrossEntropyLoss(reduction='none')(preds, labels)
             return (norm_loss*_ls).sum()
 

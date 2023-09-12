@@ -49,10 +49,10 @@ def prepare(train_data,train_params,arch_gcn):
     adj_full_norm = adj_norm(adj_full)
     num_classes = class_arr.shape[1]
 
-    minibatch = Minibatch(adj_full_norm, adj_train, role, train_params)
+    minibatch = Minibatch(adj_full_norm, adj_full, role, train_params)
     model = GraphSAINT(num_classes, arch_gcn, train_params, feat_full, class_arr)
     printf("TOTAL NUM OF PARAMS = {}".format(sum(p.numel() for p in model.parameters())), style="yellow")
-    minibatch_eval=Minibatch(adj_full_norm, adj_train, role, train_params, cpu_eval=True)
+    minibatch_eval=Minibatch(adj_full_norm, adj_full, role, train_params, cpu_eval=True)
     model_eval=GraphSAINT(num_classes, arch_gcn, train_params, feat_full, class_arr, cpu_eval=True)
     if args_global.gpu >= 0:
         model = model.cuda()
@@ -70,7 +70,7 @@ def train(train_phases, model, minibatch, minibatch_eval, model_eval, eval_val_e
     for ip, phase in enumerate(train_phases):
         printf('START PHASE {:4d}'.format(ip),style='underline')
         minibatch.set_sampler(phase)
-        pdb.set_trace()
+        #pdb.set_trace()
         num_batches = minibatch.num_training_batches()
         for e in range(epoch_ph_start, int(phase['end'])):
             printf('Epoch {:4d}'.format(e),style='bold')

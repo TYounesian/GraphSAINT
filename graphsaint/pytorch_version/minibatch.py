@@ -51,8 +51,8 @@ class Minibatch:
         self.use_cuda = (args_global.gpu >= 0)
         if cpu_eval:
             self.use_cuda=False
-
-        self.node_train = np.array(role['tr'])
+        self.node_train_tr = np.array(role['tr'])
+        self.node_train = np.concatenate((np.array(role['tr']), np.array(role['va']), np.array(role['te'])))
         self.node_val = np.array(role['va'])
         self.node_test = np.array(role['te'])
 
@@ -91,8 +91,8 @@ class Minibatch:
         # norm_loss_test is used in full batch evaluation (without sampling).
         # so neighbor features are simply averaged.
         self.norm_loss_test = np.zeros(self.adj_full_norm.shape[0])
-        _denom = len(self.node_train) + len(self.node_val) +  len(self.node_test)
-        self.norm_loss_test[self.node_train] = 1. / _denom
+        _denom = len(self.node_train_tr) + len(self.node_val) +  len(self.node_test)
+        self.norm_loss_test[self.node_train_tr] = 1. / _denom
         self.norm_loss_test[self.node_val] = 1. / _denom
         self.norm_loss_test[self.node_test] = 1. / _denom
         self.norm_loss_test = torch.from_numpy(self.norm_loss_test.astype(np.float32))
@@ -198,7 +198,7 @@ class Minibatch:
         for i in range(num_subg):
             self.norm_aggr_train[self.subgraphs_remaining_edge_index[i]] += 1
             self.norm_loss_train[self.subgraphs_remaining_nodes[i]] += 1
-        assert self.norm_loss_train[self.node_val].sum() + self.norm_loss_train[self.node_test].sum() == 0
+        #assert self.norm_loss_train[self.node_val].sum() + self.norm_loss_train[self.node_test].sum() == 0
         for v in range(self.adj_train.shape[0]):
             i_s = self.adj_train.indptr[v]
             i_e = self.adj_train.indptr[v + 1]
@@ -273,8 +273,17 @@ class Minibatch:
                 adj = adj.cuda()
             self.batch_num += 1
         norm_loss = self.norm_loss_test if mode in ['val','test', 'valtest'] else self.norm_loss_train
-        norm_loss = norm_loss[self.node_subgraph]
-        return self.node_subgraph, adj, norm_loss
+        if mode == 'train':
+            node_train_subg = [i for i in self.node_train_tr if i in self.node_subgraph]
+            #pdb.set_trace()
+            map = {element: index for index, element in enumerate(self.node_subgraph)}
+            local_idx_tr_subg = [map[i] for i in node_train_subg]
+            norm_loss = norm_loss[node_train_subg]
+        else:
+            node_train_subg = self.node_subgraph
+            local_idx_tr_subg = [range(0, len(node_train_subg))]
+            norm_loss = norm_loss[self.node_subgraph]
+        return local_idx_tr_subg, node_train_subg, self.node_subgraph, adj, norm_loss
 
 
     def num_training_batches(self):

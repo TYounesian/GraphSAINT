@@ -108,14 +108,14 @@ class GraphSAINT(nn.Module):
             self.idx_conv = list(np.where(np.array(self.order_layer) == 1)[0])
 
 
-    def forward(self, node_subgraph, adj_subgraph):
+    def forward(self, local_idx_tr, train_node, node_subgraph, adj_subgraph):
         feat_subg = self.feat_full[node_subgraph]
-        label_subg = self.label_full[node_subgraph]
-        label_subg_converted = label_subg if self.sigmoid_loss else self.label_full_cat[node_subgraph]
+        label_subg = self.label_full[train_node]
+        label_subg_converted = label_subg if self.sigmoid_loss else self.label_full_cat[train_node]
         _, emb_subg = self.conv_layers((adj_subgraph, feat_subg))
-        emb_subg_norm = F.normalize(emb_subg, p=2, dim=1)
+        emb_subg_norm = F.normalize(emb_subg[local_idx_tr], p=2, dim=1)
         #pred_subg = self.classifier((None, emb_subg_norm))[1]
-        return emb_subg, label_subg, label_subg_converted
+        return emb_subg[local_idx_tr], label_subg, label_subg_converted
 
 
     def _loss(self, preds, labels, norm_loss):
@@ -156,25 +156,27 @@ class GraphSAINT(nn.Module):
         return nn.Sigmoid()(preds) if self.sigmoid_loss else F.softmax(preds, dim=1)
 
 
-    def train_step(self, node_subgraph, adj_subgraph, norm_loss_subgraph):
+    def train_step(self, local_idx_tr, node_train, node_subgraph, adj_subgraph, norm_loss_subgraph):
         """
         Forward and backward propagation
         """
         self.train()
         self.optimizer.zero_grad()
-        preds, labels, labels_converted = self(node_subgraph, adj_subgraph)
+        preds, labels, labels_converted = self(local_idx_tr, node_train, node_subgraph, adj_subgraph)
+        #pdb.set_trace()
         loss = self._loss(preds, labels_converted, norm_loss_subgraph) # labels.squeeze()?
         loss.backward()
         torch.nn.utils.clip_grad_norm(self.parameters(), 5)
         self.optimizer.step()
         return loss, self.predict(preds), labels
 
-    def eval_step(self, node_subgraph, adj_subgraph, norm_loss_subgraph):
+    def eval_step(self, local, tr,  node_subgraph, adj_subgraph, norm_loss_subgraph):
         """
         Forward propagation only
         """
         self.eval()
         with torch.no_grad():
-            preds,labels,labels_converted = self(node_subgraph, adj_subgraph)
+            local_ind = [range(0, len(node_subgraph))]
+            preds,labels,labels_converted = self(local_ind, node_subgraph, node_subgraph, adj_subgraph)
             loss = self._loss(preds,labels_converted,norm_loss_subgraph)
         return loss, self.predict(preds), labels
